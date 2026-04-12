@@ -446,7 +446,7 @@ celery -A secure_lock worker -l info
 celery -A secure_lock beat -l info
 ```
 
-### Redis y MySQL
+### Redis
 
 ```bash
 # Con Docker Compose
@@ -454,7 +454,6 @@ docker-compose up redis db
 
 # O localmente
 redis-server
-mysql -u secure_lock -p
 ```
 
 ---
@@ -510,18 +509,24 @@ mysql -u secure_lock -p
 
 ## 💾 Base de Datos
 
-### Configuración MySQL
+### Configuración PostgreSQL
 
 ```bash
 # Crear base de datos
-CREATE DATABASE secure_lock CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE secure_lock;
 
 # Crear usuario
-CREATE USER 'secure_lock'@'localhost' IDENTIFIED BY 'secure_lock_pass';
+CREATE USER admin WITH PASSWORD 'secure123';
 
 # Otorgar permisos
-GRANT ALL PRIVILEGES ON secure_lock.* TO 'secure_lock'@'localhost';
-FLUSH PRIVILEGES;
+ALTER ROLE admin SET client_encoding TO 'utf8';
+ALTER ROLE admin SET default_transaction_isolation TO 'read committed';
+ALTER ROLE admin SET default_transaction_deferrable TO on;
+GRANT ALL PRIVILEGES ON DATABASE secure_lock TO admin;
+
+# Conectar a la BD
+\c secure_lock
+GRANT ALL ON SCHEMA public TO admin;
 ```
 
 ### Migraciones
@@ -704,14 +709,18 @@ LOGGING = {
 
 ## 🐛 Troubleshooting
 
-### Problema: No conecta a MySQL
+### Problema: No conecta a PostgreSQL
 
 ```bash
 # Verificar conexión
 python manage.py dbshell
 
-# Revisar settings DATABASE_URL
-# Verificar MySQL está corriendo
+# Revisar settings DB_HOST, DB_PORT, DB_NAME
+# Verificar PostgreSQL está corriendo
+docker-compose ps db
+
+# Ver logs de PostgreSQL
+docker-compose logs db
 ```
 
 ### Problema: WebSocket no funciona
