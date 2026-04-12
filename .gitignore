@@ -1,9 +1,27 @@
+# Python
 __pycache__/
 *.py[cod]
+*.sqlite3
+
+# Entornos
 .env
 .venv/
 venv/
+
+# Archivos de Django
 staticfiles/
 media/
+
+# IDEs
 .idea/
 .vscode/
+
+# Celery
+celerybeat-schedule*
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
