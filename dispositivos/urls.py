@@ -1,0 +1,10 @@
+"""URL routes for devices app."""
+
+from rest_framework.routers import DefaultRouter
+
+from .views import DeviceViewSet
+
+router = DefaultRouter()
+router.register(r"", DeviceViewSet, basename="device")
+
+urlpatterns = router.urls
