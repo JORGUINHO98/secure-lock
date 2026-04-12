@@ -7,7 +7,6 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
 from django.utils import timezone
 
 PREMIUM_PRICE_USD = Decimal("13.00")
@@ -40,17 +39,19 @@ class Subscription(models.Model):
 
     class Meta:
         ordering = ("-expires_at",)
-        constraints = [
-            models.UniqueConstraint(
-                fields=("user",),
-                condition=Q(status="ACTIVE"),
-                name="unique_active_subscription_per_user",
-            )
-        ]
 
     def clean(self):
         if self.expires_at <= self.starts_at:
             raise ValidationError("La fecha de expiracion debe ser mayor al inicio.")
+
+        if self.status == self.Status.ACTIVE:
+            exists = Subscription.objects.filter(
+                user=self.user,
+                status=self.Status.ACTIVE
+            ).exclude(pk=self.pk).exists()
+
+            if exists:
+                raise ValidationError("El usuario ya tiene una suscripción activa")
 
         if self.plan_type == self.PlanType.PREMIUM:
             if self.price_usd != PREMIUM_PRICE_USD:
