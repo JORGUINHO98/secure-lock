@@ -40,7 +40,7 @@ graph TB
     end
 
     subgraph Data["💾 Datos & Cache"]
-        DB["🐬 MySQL<br/>(Modelos ORM)"]
+        DB["� PostgreSQL<br/>(Modelos ORM)"]
         Redis["🔴 Redis<br/>(Cache & Pub/Sub)"]
     end
 
@@ -228,7 +228,7 @@ erDiagram
 sequenceDiagram
     actor Creator as 📱 Creador
     participant API
-    participant DB as MySQL
+    participant DB as PostgreSQL
     participant Redis
     participant WS as WebSocket
     participant Device as 📱 Dispositivo
@@ -306,8 +306,8 @@ sequenceDiagram
 | **Autenticación** | djangorestframework-simplejwt | 5.3.1+ |
 | **WebSockets** | Django Channels | 4.1.0+ |
 | **WebSocket Redis** | channels-redis | 4.2.0+ |
-| **Base de Datos** | MySQL | - |
-| **Driver MySQL** | PyMySQL | 1.1.1+ |
+| **Base de Datos** | PostgreSQL | 16+ |
+| **Driver PostgreSQL** | psycopg2-binary | 2.9.9+ |
 | **Cache & Pub/Sub** | Redis | 5.0.7+ |
 | **Task Queue** | Celery | 5.4.0+ |
 | **Web Server** | Gunicorn + Uvicorn | 22.0.0+ |
@@ -324,7 +324,7 @@ sequenceDiagram
 
 - Python 3.10+
 - Docker & Docker Compose
-- MySQL 5.7+
+- PostgreSQL 14+
 - Redis 6.0+
 - Firebase Cloud Messaging (FCM) credenciales
 
@@ -346,12 +346,11 @@ DEBUG=False
 ALLOWED_HOSTS=localhost,127.0.0.1,your-domain.com
 
 # Base de Datos
-DATABASE_URL=mysql://user:password@localhost:3306/secure_lock
-MYSQL_HOST=db
-MYSQL_PORT=3306
-MYSQL_USER=secure_lock
-MYSQL_PASSWORD=secure_lock_pass
-MYSQL_DATABASE=secure_lock
+DB_NAME=secure_lock
+DB_USER=admin
+DB_PASSWORD=secure123
+DB_HOST=db
+DB_PORT=5432
 
 # Redis
 REDIS_URL=redis://localhost:6379/0

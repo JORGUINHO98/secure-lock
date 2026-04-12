@@ -1,10 +1,22 @@
-"""Root URL configuration for Secure Lock."""
-
+from django.http import JsonResponse
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+def home(request):
+    return JsonResponse({
+        "mensaje": "API Secure Lock funcionando 🚀",
+        "endpoints": [
+            "/api/users/",
+            "/api/dispositivos/",
+            "/api/salas/",
+            "/api/suscripciones/",
+            "/api/auth/token/"
+        ]
+    })
+
 urlpatterns = [
+    path('', home),  # 👈 AGREGA ESTO
     path("admin/", admin.site.urls),
     path("api/users/", include("users.urls")),
     path("api/dispositivos/", include("dispositivos.urls")),

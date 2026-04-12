@@ -6,10 +6,6 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
-import pymysql
-
-pymysql.install_as_MySQLdb()
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -78,15 +74,16 @@ ASGI_APPLICATION = "secure_lock.asgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("DB_NAME", "secure-lock"),
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME", "secure_lock"),
         "USER": os.getenv("DB_USER", "admin"),
         "PASSWORD": os.getenv("DB_PASSWORD", "secure123"),
         "HOST": os.getenv("DB_HOST", "db"),
-        "PORT": int(os.getenv("DB_PORT", "3306")),
+        "PORT": int(os.getenv("DB_PORT", "5432")),
+        "ATOMIC_REQUESTS": True,
+        "CONN_MAX_AGE": 600,
         "OPTIONS": {
-            "charset": "utf8mb4",
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+            "connect_timeout": 10,
         },
     }
 }
@@ -158,3 +155,83 @@ FREE_LOCKS_PER_DAY = int(os.getenv("FREE_LOCKS_PER_DAY", "3"))
 PREMIUM_PLAN_PRICE = os.getenv("PREMIUM_PLAN_PRICE", "13.00")
 
 CORS_ALLOW_ALL_ORIGINS = _env_bool("CORS_ALLOW_ALL_ORIGINS", default=True)
+
+# ============================================================================
+# SECURITY & OPTIMIZATION FOR PRODUCTION
+# ============================================================================
+
+# SSL & SECURITY
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = "DENY"
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+# DATABASE OPTIMIZATION
+DATABASES["default"]["CONN_MAX_AGE"] = 600
+DATABASES["default"]["OPTIONS"] = {
+    "connect_timeout": 10,
+    "options": "-c statement_timeout=30000",
+}
+
+# CACHE CONFIGURATION (Redis)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv("REDIS_URL", "redis://redis:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "secure_lock",
+        "TIMEOUT": 300,
+    }
+}
+
+# SESSION CONFIGURATION
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
+
+# RATE LIMITING
+REST_FRAMEWORK.update({
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",
+        "user": "1000/hour",
+    },
+})
+
+# LOGGING
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{levelname}] {asctime} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+    },
+}
