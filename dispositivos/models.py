@@ -18,7 +18,7 @@ class Device(models.Model):
     )
     id_unico = models.CharField(max_length=140, unique=True, db_index=True)
     display_name = models.CharField(max_length=140)
-    fcm_token = models.CharField(max_length=400, blank=True)
+    fcm_token = models.TextField(blank=True)
     is_locked = models.BooleanField(default=False)
     battery_level = models.PositiveSmallIntegerField(
         default=100,

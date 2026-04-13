@@ -549,30 +549,62 @@ python manage.py migrate app_name 0001
 
 ## 🔌 WebSocket / Real-time
 
-### Conexión WebSocket
+### Conexión WebSocket (Autenticada con JWT)
+
+A partir de Abril 2026, las conexiones WebSocket requieren autenticación JWT válida.
+
+**Paso 1: Obtener JWT Token**
+
+```bash
+curl -X POST http://localhost:8000/api/auth/login/ \
+  -d "email=user@example.com&password=password" \
+  -H "Content-Type: application/json"
+
+# Respuesta: {"access": "eyJ...", "refresh": "eyJ..."}
+```
+
+**Paso 2: Conectar WebSocket con Token**
 
 ```javascript
 // Cliente (JavaScript)
-const socket = new WebSocket('ws://localhost:8000/ws/devices/123/?token=JWT_TOKEN');
+const token = localStorage.getItem('access_token');
+const socket = new WebSocket(
+    `wss://localhost:8000/ws/devices/device-unique-id/?token=${token}`
+);
 
 socket.onopen = (event) => {
-    console.log('✅ Conectado');
+    console.log('✅ Conectado al WebSocket');
 };
 
 socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    console.log('📨 Mensaje:', data);
-    // {type: 'lock', action: 'LOCK', device_id: 123}
+    console.log('📨 Mensaje en tiempo real:', data);
 };
 
 socket.onerror = (event) => {
-    console.error('❌ Error:', event);
+    if (event.code === 4001) {
+        console.error('❌ Error 4001: Token JWT inválido o expirado');
+    } else if (event.code === 4003) {
+        console.error('❌ Error 4003: No tienes permiso para este dispositivo');
+    } else {
+        console.error('❌ Error:', event);
+    }
 };
 
 socket.onclose = (event) => {
-    console.log('❌ Desconectado');
+    console.log('⚠️ Desconectado. Reconectando en 5 segundos...');
+    setTimeout(() => location.reload(), 5000);
 };
 ```
+
+### Códigos de Error WebSocket
+
+| Código | Significado | Acción |
+|--------|-----------|--------|
+| `4001` | Token inválido/expirado | Obtener nuevo token con refresh |
+| `4003` | Usuario no autorizado | Verificar ownership del dispositivo |
+| `1000` | Cierre normal | Reconectar después de reautenticar |
+| `1006` | Cierre anormal | Verificar conexión a Red/Redis |
 
 ### Eventos WebSocket
 
@@ -598,6 +630,10 @@ socket.onclose = (event) => {
 {
     "type": "device_update",
     "device_id": 123,
+    "battery_level": 75,
+    "last_seen": "2024-04-12T10:35:00Z"
+}
+```
     "battery_level": 75,
     "last_seen": "2024-04-12T10:35:00Z"
 }
@@ -645,26 +681,94 @@ Contraseña: (la que configuraste)
 
 ### Implementado
 
-- ✅ **JWT Token-based** autenticación
+- ✅ **JWT Token-based** autenticación (REST API)
+- ✅ **WebSocket JWT Authentication** con validación de tokens y ownership de dispositivos
 - ✅ **CORS** configurado
 - ✅ **Permisos** por rol (Creator/Target)
 - ✅ **HTTPS** en producción
 - ✅ **SECRET_KEY** secreto
-- ✅ **Rate limiting** (recomendado)
+- ✅ **Rate limiting** implementado
 - ✅ **CSRF** protección
 - ✅ **SQL Injection** protección (ORM Django)
+- ✅ **Database Integrity** con SET_NULL para auditoría
+- ✅ **FCM Token** valores sin límite de longitud (TextField)
 
-### Recomendaciones para Producción
+### Mejoras de Seguridad - Abril 2026
+
+#### 1. WebSocket JWT Authentication
+Se implementó middleware personalizado (`users/middleware.py`) que:
+- Extrae tokens JWT del query string: `ws://localhost:8000/ws/devices/{id}/?token=JWT`
+- Valida tokens usando `rest_framework_simplejwt`
+- Cierra conexiones no autenticadas con código `4001` (Unauthorized)
+- Verifica que el usuario sea propietario del dispositivo (código `4003` si no autorizado)
+
+**Implementación:**
+```javascript
+// Cliente: Conectar con WebSocket autenticado
+const token = localStorage.getItem('access_token');
+const socket = new WebSocket(
+    `ws://localhost:8000/ws/devices/device-123/?token=${token}`
+);
+
+socket.onopen = () => console.log('✅ Conectado con autenticación');
+socket.onerror = (e) => {
+    if (e.code === 4001) console.error('❌ Token inválido');
+    if (e.code === 4003) console.error('❌ No autorizado para este dispositivo');
+};
+```
+
+**Archivos modificados:**
+- `users/middleware.py` (nuevo) - TokenAuthMiddleware
+- `secure_lock/asgi.py` - Reemplaza AuthMiddlewareStack con TokenAuthMiddleware
+- `dispositivos/consumers.py` - Validación JWT en connect()
+
+#### 2. Robustez de Base de Datos
+- **FCM Token**: Convertido a `TextField` (sin límite) para soportar tokens Firebase de cualquier longitud
+  - Antes: `CharField(max_length=400)` → Crashes si exceede límite
+  - Ahora: `TextField` → Sin límites de longitud
+  - Migración: `dispositivos/migrations/0003_alter_device_fcm_token.py`
+
+#### 3. Integridad de Auditoría
+- **DeviceLockEvent.requested_by**: `on_delete=models.SET_NULL` preserva historial de eventos incluso si usuario se elimina
+- **DeviceLockEvent.device**: Configurado con CASCADE para evitar eventos huérfanos
+
+### Configuración de Seguridad en Producción
 
 ```python
 # settings.py
 DEBUG = False
 ALLOWED_HOSTS = ['your-domain.com']
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+# SSL & HTTPS
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+
+# Headers de Seguridad
 SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_SECURITY_POLICY = {...}
+X_FRAME_OPTIONS = "DENY"
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+# Content Security Policy (opcional)
+SECURE_CONTENT_SECURITY_POLICY = {
+    "default-src": ("'self'",),
+    "script-src": ("'self'", "trusted-cdn.com"),
+    "style-src": ("'self'", "'unsafe-inline'"),
+    "img-src": ("'self'", "data:", "https:"),
+}
+```
+
+### Comandos para Aplicar Cambios
+
+```bash
+# Aplicar migraciones (incluye cambios de seguridad)
+docker-compose exec web python manage.py migrate
+
+# Reiniciar servicios
+docker-compose restart web channels redis
 ```
 
 ---
