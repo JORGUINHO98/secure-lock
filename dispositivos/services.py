@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from typing import Any
 
 from asgiref.sync import async_to_sync
@@ -21,9 +23,25 @@ def _ensure_firebase_initialized() -> bool:
     if _firebase_ready:
         return True
 
+    # First, try to load credentials from environment variable
+    creds_json_str = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    if creds_json_str:
+        try:
+            creds_dict = json.loads(creds_json_str)
+            initialize_app(credentials.Certificate(creds_dict))
+            _firebase_ready = True
+            return True
+        except json.JSONDecodeError as exc:
+            logger.error("FIREBASE_CREDENTIALS_JSON is not valid JSON: %s", exc)
+            return False
+        except Exception as exc:
+            logger.exception("Firebase initialization from env failed: %s", exc)
+            return False
+
+    # Fallback: use credentials file path from settings
     creds_path = settings.FIREBASE_CREDENTIALS_PATH
     if not creds_path:
-        logger.warning("FIREBASE_CREDENTIALS_PATH is missing. Push notifications are disabled.")
+        logger.warning("FIREBASE_CREDENTIALS_PATH is missing and FIREBASE_CREDENTIALS_JSON env var not set. Push notifications are disabled.")
         return False
 
     try:

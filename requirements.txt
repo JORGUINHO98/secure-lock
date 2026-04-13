@@ -12,3 +12,4 @@ firebase-admin>=6.5.0
 qrcode[pil]>=7.4.2
 gunicorn>=22.0.0
 uvicorn[standard]>=0.30.6
+whitenoise>=6.6.0

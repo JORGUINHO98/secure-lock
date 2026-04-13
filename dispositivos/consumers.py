@@ -19,7 +19,6 @@ class DeviceStatusConsumer(AsyncJsonWebsocketConsumer):
             return False
 
         from .models import Device
-        from salas.models import Sala
 
         try:
             device = Device.objects.get(id_unico=device_id_unico)
@@ -29,8 +28,9 @@ class DeviceStatusConsumer(AsyncJsonWebsocketConsumer):
                 return True
 
             # Check if user is an admin of any sala containing this device
-            # (optional: if your Sala model has a relationship to Device)
-            # For now, we allow if user is device owner
+            if device.rooms.filter(admin_id=user_id).exists():
+                return True
+            
             return False
         except Device.DoesNotExist:
             return False
