@@ -58,7 +58,7 @@ def can_issue_lock(user) -> tuple[bool, str]:
         return (
             False,
             f"Plan gratuito alcanzo {limit} bloqueos diarios. "
-            "Activa Premium por $13.00 USD para bloqueos ilimitados.",
+            "Activa Premium por $13.99 USD para bloqueos ilimitados.",
         )
 
     return True, ""

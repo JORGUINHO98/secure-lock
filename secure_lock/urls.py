@@ -16,7 +16,7 @@ def home(request):
     })
 
 urlpatterns = [
-    path('', home),  # 👈 AGREGA ESTO
+    path('', home),
     path("admin/", admin.site.urls),
     path("api/users/", include("users.urls")),
     path("api/dispositivos/", include("dispositivos.urls")),
