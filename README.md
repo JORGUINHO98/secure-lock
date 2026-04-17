@@ -203,7 +203,7 @@ erDiagram
         int id PK
         int admin_id FK
         string name
-        string invite_code UK
+        string invite_code UKz
         datetime created_at
     }
     
