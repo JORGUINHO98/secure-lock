@@ -1,4 +1,4 @@
-"""Subscription models for freemium access control."""
+"""Subscription models for freemium and lifetime access control."""
 
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
-PREMIUM_PRICE_USD = Decimal("13.00")
+PREMIUM_PRICE_USD = Decimal("13.99")
 
 
 class Subscription(models.Model):
-    """Represents a user subscription in the freemium model."""
+    """Represents a user subscription in the freemium or lifetime model."""
 
     class PlanType(models.TextChoices):
         FREE = "FREE", "Free"
@@ -33,15 +33,18 @@ class Subscription(models.Model):
     price_usd = models.DecimalField(max_digits=8, decimal_places=2, default=Decimal("0.00"))
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     starts_at = models.DateTimeField(default=timezone.now)
-    expires_at = models.DateTimeField()
+    # MODIFICACIÓN 1: Permite que expires_at esté vacío (nulo) para pagos de por vida.
+    expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ("-expires_at",)
+        # F nulls_last pone los planes de por vida de primeros en el panel de administrador
+        ordering = (models.F('expires_at').desc(nulls_last=True),)
 
     def clean(self):
-        if self.expires_at <= self.starts_at:
+        # MODIFICACIÓN 2: Solo verifica las fechas si expires_at NO está vacío.
+        if self.expires_at and self.expires_at <= self.starts_at:
             raise ValidationError("La fecha de expiracion debe ser mayor al inicio.")
 
         if self.status == self.Status.ACTIVE:
@@ -71,7 +74,20 @@ class Subscription(models.Model):
 
     @property
     def is_active_now(self) -> bool:
-        return self.status == self.Status.ACTIVE and self.expires_at > timezone.now()
+        """
+        Devuelve True si la suscripción está activa.
+        Si expires_at es nulo, significa que es acceso de por vida.
+        """
+        # Si el estado no es ACTIVO (ej. el padre canceló o pidió reembolso), devolvemos False de inmediato.
+        if self.status != self.Status.ACTIVE:
+            return False
+
+        # MODIFICACIÓN 3: Si no hay fecha de expiración, ¡está activa para siempre!
+        if self.expires_at is None:
+            return True
+
+        # Si sí hay una fecha de expiración, comprobamos que no haya vencido aún.
+        return self.expires_at > timezone.now()
 
     def __str__(self) -> str:
         return f"{self.user_id} - {self.plan_type} ({self.status})"
