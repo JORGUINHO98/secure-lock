@@ -2,13 +2,15 @@
 
 Backend robusto de una aplicación móvil para **bloqueo remoto de dispositivos** en tiempo real. 
 
-El sistema sigue un modelo **Freemium**, permitiendo a los usuarios creadores administrar dispositivos, agruparlos en salas mediante códigos QR y ejecutar bloqueos programados o instantáneos con notificaciones de alta prioridad.
+El sistema sigue un modelo **Freemium**, permitiendo a los usuarios creadores administrar dispositivos, agruparlos en salas mediante códigos QR y ejecutar bloqueos programados o instantáneos. 
+
+*Nota de Desarrollo:* Esta fase del proyecto está optimizada para demostraciones con **Expo Go**, utilizando **WebSockets** como motor principal de tiempo real. El código cuenta con "Degradación Elegante" (Graceful Degradation), lo que significa que la infraestructura para notificaciones Push nativas está programada pero desactivada hasta su futura compilación en código nativo puro.
 
 ### 📋 Características Principales
 
 - ✅ **Autenticación JWT** con roles diferenciados (Creator / Target)
-- ✅ **Bloqueo remoto en tiempo real** mediante WebSockets
-- ✅ **Notificaciones Push** con Firebase FCM
+- ✅ **Bloqueo remoto en tiempo real instantáneo** mediante WebSockets
+- ⏳ **Notificaciones Push** con Firebase FCM *(Infraestructura lista para futura implementación nativa)*
 - ✅ **Desbloqueos programados** con Celery
 - ✅ **Modelo Freemium** con planes Premium
 - ✅ **Organización de dispositivos** por salas
@@ -20,7 +22,7 @@ El sistema sigue un modelo **Freemium**, permitiendo a los usuarios creadores ad
 
 ## 🏗️ Arquitectura del Sistema
 
-El flujo de datos está diseñado para ser **rápido** y **tolerante a fallos**, utilizando **Django Channels** para conexiones persistentes y **Firebase Cloud Messaging (FCM)** como respaldo de alta prioridad.
+El flujo de datos está diseñado para ser **rápido** y **tolerante a fallos**, utilizando **Django Channels** para conexiones persistentes.
 
 ```mermaid
 graph TB
@@ -45,7 +47,7 @@ graph TB
     end
 
     subgraph External["🔌 Servicios Externos"]
-        FCM["🔥 Firebase FCM<br/>(Push Notifications)"]
+        FCM["🔥 Firebase FCM<br/>(Futura Implementación)"]
     end
 
     %% Relaciones del Creador
@@ -56,17 +58,17 @@ graph TB
     API -->|Lee/Escribe<br/>ORM| DB
     API -->|Publica Eventos| Redis
     API -->|Agenda<br/>Auto-desbloqueo| Celery
-    API -->|Envía Push| FCM
+    API -.->|Envía Push| FCM
     
     %% Tareas Asíncronas
     Celery -->|Consume<br/>Eventos| Redis
     Celery -->|Actualiza| DB
-    Celery -->|Envía Push| FCM
+    Celery -.->|Envía Push| FCM
     
     %% Relaciones del Target
     T -->|WebSocket<br/>Conexión| WS
     WS -->|Suscripción<br/>a Eventos| Redis
-    FCM -->|Push<br/>Notification| T
+    FCM -.->|Push<br/>Notification| T
 ```
 
 ---
@@ -326,7 +328,6 @@ sequenceDiagram
 - Docker & Docker Compose
 - PostgreSQL 14+
 - Redis 6.0+
-- Firebase Cloud Messaging (FCM) credenciales
 
 ### 1️⃣ Clonar Repositorio
 
@@ -361,9 +362,9 @@ REDIS_PORT=6379
 CELERY_BROKER_URL=redis://localhost:6379/1
 CELERY_RESULT_BACKEND=redis://localhost:6379/2
 
-# Firebase FCM
-FIREBASE_CREDENTIALS_PATH=path/to/firebase-credentials.json
-FIREBASE_PROJECT_ID=your-firebase-project-id
+# Firebase (Desactivado para la demostración con Expo Go)
+# FIREBASE_PROJECT_ID=
+# FIREBASE_CREDENTIALS_PATH=
 
 # JWT
 JWT_SECRET_KEY=your-jwt-secret-key
@@ -413,13 +414,13 @@ docker-compose build
 docker-compose up -d
 
 # Ver logs
-docker-compose logs -f web
+docker-compose logs -f backend
 
 # Crear superusuario
-docker-compose exec web python manage.py createsuperuser
+docker-compose exec backend python manage.py createsuperuser
 
 # Aplicar migraciones
-docker-compose exec web python manage.py migrate
+docker-compose exec backend python manage.py migrate
 ```
 
 ---
@@ -507,47 +508,7 @@ redis-server
 
 ---
 
-## 💾 Base de Datos
-
-### Configuración PostgreSQL
-
-```bash
-# Crear base de datos
-CREATE DATABASE secure_lock;
-
-# Crear usuario
-CREATE USER admin WITH PASSWORD 'secure123';
-
-# Otorgar permisos
-ALTER ROLE admin SET client_encoding TO 'utf8';
-ALTER ROLE admin SET default_transaction_isolation TO 'read committed';
-ALTER ROLE admin SET default_transaction_deferrable TO on;
-GRANT ALL PRIVILEGES ON DATABASE secure_lock TO admin;
-
-# Conectar a la BD
-\c secure_lock
-GRANT ALL ON SCHEMA public TO admin;
-```
-
-### Migraciones
-
-```bash
-# Crear nueva migración
-python manage.py makemigrations
-
-# Aplicar migraciones
-python manage.py migrate
-
-# Ver estado de migraciones
-python manage.py showmigrations
-
-# Revertir última migración
-python manage.py migrate app_name 0001
-```
-
----
-
-## 🔌 WebSocket / Real-time
+##  WebSocket / Real-time
 
 ### Conexión WebSocket (Autenticada con JWT)
 
@@ -626,14 +587,10 @@ socket.onclose = (event) => {
     "timestamp": "2024-04-12T11:00:00Z"
 }
 
-// Actualización de batería
+// Actualización de estado
 {
     "type": "device_update",
     "device_id": 123,
-    "battery_level": 75,
-    "last_seen": "2024-04-12T10:35:00Z"
-}
-```
     "battery_level": 75,
     "last_seen": "2024-04-12T10:35:00Z"
 }
@@ -765,10 +722,10 @@ SECURE_CONTENT_SECURITY_POLICY = {
 
 ```bash
 # Aplicar migraciones (incluye cambios de seguridad)
-docker-compose exec web python manage.py migrate
+docker-compose exec backend python manage.py migrate
 
 # Reiniciar servicios
-docker-compose restart web channels redis
+docker-compose restart backend celery_worker celery_beat redis
 ```
 
 ---
