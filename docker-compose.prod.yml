@@ -1,0 +1,56 @@
+  # Django API Server
+  backend:
+    build: .
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+      gunicorn secure_lock.asgi:application 
+      -k uvicorn.workers.UvicornWorker 
+      --bind 0.0.0.0:8000 
+      --workers 4 
+      --access-logfile - 
+      --error-logfile - 
+      --log-level info"
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=secure_lock.settings
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - secure_lock_network
+
+  # Celery Worker - Async Tasks
+  celery_worker:
+    build: .
+    restart: unless-stopped
+    command: celery -A secure_lock worker -l info --concurrency=4
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - secure_lock_network
+
+  # Celery Beat - Scheduled Tasks
+  celery_beat:
+    build: .
+    restart: unless-stopped
+    command: celery -A secure_lock beat -l info
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - secure_lock_network
