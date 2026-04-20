@@ -1,4 +1,34 @@
-  # Django API Server
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-secure_lock}
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - secure_lock_network
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - secure_lock_network
+
   backend:
     build: .
     restart: unless-stopped
@@ -25,7 +55,6 @@
     networks:
       - secure_lock_network
 
-  # Celery Worker - Async Tasks
   celery_worker:
     build: .
     restart: unless-stopped
@@ -40,7 +69,6 @@
     networks:
       - secure_lock_network
 
-  # Celery Beat - Scheduled Tasks
   celery_beat:
     build: .
     restart: unless-stopped
@@ -54,3 +82,11 @@
         condition: service_started
     networks:
       - secure_lock_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  secure_lock_network:
+    driver: bridge
