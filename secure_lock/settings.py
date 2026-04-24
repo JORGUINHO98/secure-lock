@@ -160,7 +160,7 @@ PREMIUM_PLAN_PRICE = os.getenv("PREMIUM_PLAN_PRICE", "13.99")
 MAX_FREE_ROOMS = 2
 MAX_FREE_DEVICES_PER_ROOM = 2
 
-CORS_ALLOW_ALL_ORIGINS = _env_bool("CORS_ALLOW_ALL_ORIGINS", default=True)
+CORS_ALLOW_ALL_ORIGINS = _env_bool("CORS_ALLOW_ALL_ORIGINS", default=False)
 
 # ============================================================================
 # SECURITY & OPTIMIZATION FOR PRODUCTION

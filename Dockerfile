@@ -27,4 +27,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["gunicorn", "secure_lock.asgi:application", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "4"]
+CMD ["gunicorn", "secure_lock.asgi:application", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--workers", "2"]
