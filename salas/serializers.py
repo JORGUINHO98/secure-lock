@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from django.conf import settings
 from dispositivos.models import Device
+from suscripciones.services import has_active_premium
 from users.models import User
 
 from .models import Room
@@ -51,6 +53,16 @@ class RoomSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         if user.role != User.Role.CREATOR:
             raise serializers.ValidationError("Solo usuarios Creador pueden administrar salas.")
+        
+        # Verificar límites de salas para usuarios gratuitos
+        if not has_active_premium(user):
+            existing_rooms = Room.objects.filter(admin=user).count()
+            if existing_rooms >= settings.MAX_FREE_ROOMS:
+                raise serializers.ValidationError(
+                    f"Plan gratuito limitado a {settings.MAX_FREE_ROOMS} salas. "
+                    "Activa Premium por $13.99 USD para salas ilimitadas."
+                )
+        
         return attrs
 
     def create(self, validated_data):

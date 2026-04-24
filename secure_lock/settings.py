@@ -152,8 +152,13 @@ CELERY_TIMEZONE = TIME_ZONE
 FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
 
-FREE_LOCKS_PER_DAY = int(os.getenv("FREE_LOCKS_PER_DAY", "3"))
 PREMIUM_PLAN_PRICE = os.getenv("PREMIUM_PLAN_PRICE", "13.99")
+
+# ============================================================================
+# FREEMIUM CAPACITY LIMITS
+# ============================================================================
+MAX_FREE_ROOMS = 2
+MAX_FREE_DEVICES_PER_ROOM = 2
 
 CORS_ALLOW_ALL_ORIGINS = _env_bool("CORS_ALLOW_ALL_ORIGINS", default=True)
 

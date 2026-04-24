@@ -41,27 +41,10 @@ def has_active_premium(user) -> bool:
 
 def can_issue_lock(user) -> tuple[bool, str]:
     """
-    Validate freemium lock restrictions.
+    Validate lock permissions.
 
-    Premium users can lock without limit.
-    Free users are limited by FREE_LOCKS_PER_DAY.
+    Bloqueos ilimitados para todos los usuarios, siempre que el dispositivo
+    esté dentro de una sala permitida. Las restricciones de capacidad se
+    aplican en la creación de salas y vinculación de dispositivos.
     """
-    if has_active_premium(user):
-        return True, ""
-
-    limit = settings.FREE_LOCKS_PER_DAY
-    today = timezone.localdate()
-    used_locks = DeviceLockEvent.objects.filter(
-        requested_by=user,
-        action=DeviceLockEvent.Action.LOCK,
-        created_at__date=today,
-    ).count()
-
-    if used_locks >= limit:
-        return (
-            False,
-            f"Plan gratuito alcanzó {limit} bloqueos diarios. "
-            "Activa Premium por $13.99 USD para bloqueos ilimitados de por vida.",
-        )
-
     return True, ""

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from dispositivos.models import Device
+from suscripciones.services import has_active_premium
 from users.models import User
 
 from .models import Room
@@ -134,6 +136,17 @@ class RoomViewSet(viewsets.ModelViewSet):
                     {"detail": "Solo puedes vincular tus propios dispositivos."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
+
+            # Verificar límites de dispositivos para usuarios gratuitos
+            if not has_active_premium(room.admin):
+                if room.devices.count() >= settings.MAX_FREE_DEVICES_PER_ROOM:
+                    return Response(
+                        {
+                            "detail": f"Plan gratuito limitado a {settings.MAX_FREE_DEVICES_PER_ROOM} dispositivos por sala. "
+                            "Activa Premium por $13.99 USD para dispositivos ilimitados."
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
 
             room.devices.add(device)
             return Response(
