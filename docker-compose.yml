@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${DB_USER:-admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secure123}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
-      - "127.0.0.1:6379:6379"
+      - "6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -45,8 +45,6 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=secure_lock.settings
-    volumes:
-      - .:/app
     ports:
       - "8000:8000"
     depends_on:
@@ -63,8 +61,6 @@ services:
     command: celery -A secure_lock worker -l info --concurrency=4
     env_file:
       - .env
-    volumes:
-      - .:/app
     depends_on:
       db:
         condition: service_healthy
@@ -79,27 +75,11 @@ services:
     command: celery -A secure_lock beat -l info
     env_file:
       - .env
-    volumes:
-      - .:/app
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
-    networks:
-      - secure_lock_network
-
-  pgadmin:
-    image: dpage/pgadmin4
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
-    ports:
-      - "127.0.0.1:5050:80"
-    depends_on:
-      db:
-        condition: service_healthy
     networks:
       - secure_lock_network
 
