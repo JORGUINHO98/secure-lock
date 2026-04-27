@@ -5,7 +5,7 @@
 # 🔐 Secure Lock Backend
 
 > [!IMPORTANT]
-> **Secure Lock** is a robust backend solution for real-time remote device locking, designed with a focus on security, performance, and scalability.
+> **Secure Lock** es una solución backend robusta para el bloqueo remoto de dispositivos en tiempo real, diseñada con un enfoque en seguridad, rendimiento y escalabilidad.
 
 El sistema sigue un modelo **Freemium**, permitiendo a los usuarios creadores administrar dispositivos, agruparlos en salas mediante códigos QR y ejecutar bloqueos programados o instantáneos. 
 
@@ -81,12 +81,12 @@ AppMovil-Backend/
 
 ```mermaid
 erDiagram
-    USER ||--o{ DEVICE : owns
-    USER ||--o{ ROOM : administers
-    USER ||--o{ SUBSCRIPTION : has
-    DEVICE ||--o{ DEVICELOCKEVENT : logs
-    DEVICE }o--|| USER : locked_by
-    DEVICE }o--o{ ROOM : belongs_to
+    USER ||--o{ DEVICE : posee
+    USER ||--o{ ROOM : administra
+    USER ||--o{ SUBSCRIPTION : tiene
+    DEVICE ||--o{ DEVICELOCKEVENT : registra
+    DEVICE }o--|| USER : bloqueado_por
+    DEVICE }o--o{ ROOM : pertenece_a
     
     USER {
         int id PK
@@ -178,16 +178,16 @@ sequenceDiagram
     participant API as Django API
     participant JWT as JWT Service
 
-    User->>App: Login Credentials
+    User->>App: Credenciales de Login
     App->>API: POST /auth/login
     API->>JWT: Generar Tokens
     JWT-->>App: {access, refresh}
     
     Note over App: Solicitudes posteriores
-    App->>API: GET /data (Header: Bearer)
+    App->>API: GET /data (Cabecera: Bearer)
     alt Token Expirado
         App->>API: POST /auth/refresh
-        API-->>App: Nuevo Access Token
+        API-->>App: Nuevo Token de Acceso
     end
 ```
 
@@ -249,7 +249,7 @@ docker-compose exec backend python manage.py createsuperuser
 | **Auth** | `POST` | `/api/auth/login/` |
 | **Devices** | `POST` | `/api/devices/{id}/lock/` |
 | **Rooms** | `GET` | `/api/rooms/invite/{code}/` |
-| **Plans** | `GET` | `/api/subscriptions/plans/` |
+| **Planes** | `GET` | `/api/subscriptions/plans/` |
 
 ---
 
