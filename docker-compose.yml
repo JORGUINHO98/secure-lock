@@ -55,34 +55,6 @@ services:
     networks:
       - secure_lock_network
 
-  celery_worker:
-    build: .
-    restart: unless-stopped
-    command: celery -A secure_lock worker -l info --concurrency=2
-    env_file:
-      - .env
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    networks:
-      - secure_lock_network
-
-  celery_beat:
-    build: .
-    restart: unless-stopped
-    command: celery -A secure_lock beat -l info
-    env_file:
-      - .env
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    networks:
-      - secure_lock_network
-
 volumes:
   postgres_data:
   redis_data:

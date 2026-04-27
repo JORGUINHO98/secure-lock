@@ -10,8 +10,6 @@ El sistema sigue un modelo **Freemium**, permitiendo a los usuarios creadores ad
 
 - ✅ **Autenticación JWT** con roles diferenciados (Creator / Target)
 - ✅ **Bloqueo remoto en tiempo real instantáneo** mediante WebSockets
-- ⏳ **Notificaciones Push** con Firebase FCM *(Infraestructura lista para futura implementación nativa)*
-- ✅ **Desbloqueos programados** con Celery
 - ✅ **Modelo Freemium** con planes Premium
 - ✅ **Organización de dispositivos** por salas
 - ✅ **Códigos QR** para invitaciones a salas
@@ -37,17 +35,13 @@ graph TB
         AUTH["🔐 JWT Auth<br/>(simplejwt)"]
     end
 
-    subgraph Workers["⏱️ Tareas Asincrónicas"]
-        Celery["⏰ Celery Worker<br/>(Redis Broker)"]
-    end
-
     subgraph Data["💾 Datos & Cache"]
-        DB["� PostgreSQL<br/>(Modelos ORM)"]
+        DB["🗄️ PostgreSQL<br/>(Modelos ORM)"]
         Redis["🔴 Redis<br/>(Cache & Pub/Sub)"]
     end
 
     subgraph External["🔌 Servicios Externos"]
-        FCM["🔥 Firebase FCM<br/>(Futura Implementación)"]
+        EMPTY["(Sin dependencias externas)"]
     end
 
     %% Relaciones del Creador
@@ -57,18 +51,10 @@ graph TB
     %% Lógica de la API
     API -->|Lee/Escribe<br/>ORM| DB
     API -->|Publica Eventos| Redis
-    API -->|Agenda<br/>Auto-desbloqueo| Celery
-    API -.->|Envía Push| FCM
-    
-    %% Tareas Asíncronas
-    Celery -->|Consume<br/>Eventos| Redis
-    Celery -->|Actualiza| DB
-    Celery -.->|Envía Push| FCM
-    
+
     %% Relaciones del Target
     T -->|WebSocket<br/>Conexión| WS
     WS -->|Suscripción<br/>a Eventos| Redis
-    FCM -.->|Push<br/>Notification| T
 ```
 
 ---
@@ -89,7 +75,6 @@ AppMovil-Backend/
 │       ├── asgi.py              # ASGI para WebSockets
 │       ├── wsgi.py              # WSGI para Gunicorn
 │       ├── urls.py              # Router principal
-│       ├── celery.py            # Config de Celery
 │       └── routing.py           # WebSocket routing
 │
 ├── 👥 Módulo: Usuarios
@@ -113,7 +98,6 @@ AppMovil-Backend/
 │   │   ├── views.py             # CRUD endpoints
 │   │   ├── urls.py              # Rutas
 │   │   ├── services.py          # Lógica de negocio
-│   │   ├── tasks.py             # Tareas Celery
 │   │   ├── consumers.py         # WebSocket consumers
 │   │   ├── routing.py           # Rutas WebSocket
 │   │   ├── permissions.py       # Permisos custom
@@ -234,8 +218,6 @@ sequenceDiagram
     participant Redis
     participant WS as WebSocket
     participant Device as 📱 Dispositivo
-    participant FCM as Firebase FCM
-    participant Celery
 
     Creator->>API: POST /devices/{id}/lock
     API->>DB: Crear DeviceLockEvent
@@ -248,18 +230,9 @@ sequenceDiagram
         Redis-->>WS: Evento lock
         WS->>Device: WebSocket: {action: "lock"}
         Device-->>Device: 🔒 Bloquear dispositivo
-    and Notificación Push
-        FCM->>Device: Push notification
-        Device-->>Device: 🔔 Mostrar notificación
     end
     
-    Note over Celery: Si duration_minutes
-    Celery->>DB: Esperar duración
-    Celery->>DB: Auto-unlock
-    Celery->>Redis: Publicar evento unlock
-    Redis-->>WS: Evento unlock
-    WS->>Device: WebSocket: {action: "unlock"}
-    Device-->>Device: 🔓 Desbloquear
+    Note right of Device: El campo locked_until queda registrado en DB, pero el desbloqueo automático debe ser gestionado por el cliente o una futura implementación de tareas asíncronas.
 ```
 
 ### Flujo de Autenticación
@@ -311,10 +284,8 @@ sequenceDiagram
 | **Base de Datos** | PostgreSQL | 16+ |
 | **Driver PostgreSQL** | psycopg2-binary | 2.9.9+ |
 | **Cache & Pub/Sub** | Redis | 5.0.7+ |
-| **Task Queue** | Celery | 5.4.0+ |
 | **Web Server** | Gunicorn + Uvicorn | 22.0.0+ |
 | **CORS** | django-cors-headers | 4.4.0+ |
-| **Push Notifications** | Firebase Admin SDK | 6.5.0+ |
 | **QR Codes** | qrcode | 7.4.2+ |
 | **Containerización** | Docker & Docker Compose | Latest |
 
@@ -357,14 +328,6 @@ DB_PORT=5432
 REDIS_URL=redis://localhost:6379/0
 REDIS_HOST=redis
 REDIS_PORT=6379
-
-# Celery
-CELERY_BROKER_URL=redis://localhost:6379/1
-CELERY_RESULT_BACKEND=redis://localhost:6379/2
-
-# Firebase (Desactivado para la demostración con Expo Go)
-# FIREBASE_PROJECT_ID=
-# FIREBASE_CREDENTIALS_PATH=
 
 # JWT
 JWT_SECRET_KEY=your-jwt-secret-key
@@ -437,16 +400,6 @@ python manage.py runserver 0.0.0.0:8000
 uvicorn secure_lock.asgi:application --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Celery Worker
-
-```bash
-# Terminal 1: Celery Worker
-celery -A secure_lock worker -l info
-
-# Terminal 2: Celery Beat (Tareas programadas)
-celery -A secure_lock beat -l info
-```
-
 ### Redis
 
 ```bash
@@ -481,7 +434,6 @@ redis-server
 | `DELETE` | `/api/devices/{id}/` | Eliminar dispositivo |
 | `POST` | `/api/devices/{id}/lock/` | 🔒 Bloquear dispositivo |
 | `POST` | `/api/devices/{id}/unlock/` | 🔓 Desbloquear dispositivo |
-| `POST` | `/api/devices/{id}/lock-timed/` | ⏰ Bloqueo programado |
 | `GET` | `/api/devices/{id}/lock-events/` | Historial de bloqueos |
 
 ### Salas
@@ -648,7 +600,6 @@ Contraseña: (la que configuraste)
 - ✅ **CSRF** protección
 - ✅ **SQL Injection** protección (ORM Django)
 - ✅ **Database Integrity** con SET_NULL para auditoría
-- ✅ **FCM Token** valores sin límite de longitud (TextField)
 
 ### Mejoras de Seguridad - Abril 2026
 
@@ -679,13 +630,7 @@ socket.onerror = (e) => {
 - `secure_lock/asgi.py` - Reemplaza AuthMiddlewareStack con TokenAuthMiddleware
 - `dispositivos/consumers.py` - Validación JWT en connect()
 
-#### 2. Robustez de Base de Datos
-- **FCM Token**: Convertido a `TextField` (sin límite) para soportar tokens Firebase de cualquier longitud
-  - Antes: `CharField(max_length=400)` → Crashes si exceede límite
-  - Ahora: `TextField` → Sin límites de longitud
-  - Migración: `dispositivos/migrations/0003_alter_device_fcm_token.py`
-
-#### 3. Integridad de Auditoría
+#### 2. Integridad de Auditoría
 - **DeviceLockEvent.requested_by**: `on_delete=models.SET_NULL` preserva historial de eventos incluso si usuario se elimina
 - **DeviceLockEvent.device**: Configurado con CASCADE para evitar eventos huérfanos
 
@@ -725,22 +670,12 @@ SECURE_CONTENT_SECURITY_POLICY = {
 docker-compose exec backend python manage.py migrate
 
 # Reiniciar servicios
-docker-compose restart backend celery_worker celery_beat redis
+docker-compose restart backend redis
 ```
 
 ---
 
 ## 📈 Monitoreo y Logs
-
-### Logs de Celery
-
-```bash
-# Ver tareas en tiempo real
-celery -A secure_lock events
-
-# Inspeccionar workers
-celery -A secure_lock inspect active
-```
 
 ### Logs de Django
 
@@ -794,19 +729,6 @@ redis-cli ping  # Debe devolver PONG
 pip install channels channels-redis
 ```
 
-### Problema: Celery tasks no ejecutan
-
-```bash
-# Verificar Celery worker está corriendo
-celery -A secure_lock worker -l info
-
-# Verificar Redis broker
-redis-cli KEYS '*'
-
-# Ver tasks en queue
-celery -A secure_lock inspect active
-```
-
 ---
 
 ## 📚 Recursos Útiles
@@ -814,8 +736,6 @@ celery -A secure_lock inspect active
 - [Django Documentation](https://docs.djangoproject.com/)
 - [Django REST Framework](https://www.django-rest-framework.org/)
 - [Django Channels](https://channels.readthedocs.io/)
-- [Celery Documentation](https://docs.celeryproject.org/)
-- [Firebase Cloud Messaging](https://firebase.google.com/docs/cloud-messaging)
 - [JWT Best Practices](https://tools.ietf.org/html/rfc7519)
 
 ---

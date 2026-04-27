@@ -22,7 +22,6 @@ from .serializers import (
     DeviceUnlockRequestSerializer,
 )
 from .services import broadcast_device_event, send_fcm_device_command
-from .tasks import auto_unlock_device_task
 
 
 class DeviceViewSet(viewsets.ModelViewSet):
@@ -123,9 +122,6 @@ class DeviceViewSet(viewsets.ModelViewSet):
                     expires_at=locked_until,
                     was_premium=has_active_premium(request.user),
                 )
-
-            if locked_until:
-                auto_unlock_device_task.apply_async(args=[device.id], eta=locked_until)
 
             broadcast_device_event(
                 device=device,

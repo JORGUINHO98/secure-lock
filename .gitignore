@@ -1,27 +1,41 @@
-# Python
+# 🐍 Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 *.sqlite3
 
-# Entornos
+# 🧪 Entornos virtuales
 .env
 .venv/
 venv/
 
-# Archivos de Django
+# 📦 Dependencias locales (por si acaso)
+pip-wheel-metadata/
+
+# 🗄️ Archivos de Django
 staticfiles/
 media/
 
-# IDEs
+# 🔐 Archivos sensibles
+.env.*
+*.env
+
+# 🧠 Cache de herramientas
+.mypy_cache/
+.pytest_cache/
+
+# 🧾 Logs
+*.log
+
+# 💻 IDEs
 .idea/
 .vscode/
 
-# Celery
-celerybeat-schedule*
+# 🐳 Docker
+*.pid
+*.sock
 
-# Logs
-*.log
-
-# OS
+# 🖥️ Sistema operativo
 .DS_Store
-Thumbs.db
+Thumbs.dbp;  

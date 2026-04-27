@@ -19,9 +19,14 @@ def _env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
+# 🔐 SEGURIDAD CRÍTICA
+SECRET_KEY = os.environ["SECRET_KEY"]
 DEBUG = _env_bool("DEBUG", default=False)
-ALLOWED_HOSTS = _env_list("ALLOWED_HOSTS", default="*")
+ALLOWED_HOSTS = _env_list("ALLOWED_HOSTS")
+
+# 🌐 AWS / Proxy (evita problemas HTTPS en producción)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -73,57 +78,61 @@ TEMPLATES = [
 WSGI_APPLICATION = "secure_lock.wsgi.application"
 ASGI_APPLICATION = "secure_lock.asgi.application"
 
+
+# 🗄️ BASE DE DATOS (SIN VALORES INSEGUROS)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("DB_NAME", "secure_lock"),
-        "USER": os.getenv("DB_USER", "admin"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "secure123"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST", "db"),
         "PORT": int(os.getenv("DB_PORT", "5432")),
         "ATOMIC_REQUESTS": True,
         "CONN_MAX_AGE": 600,
         "OPTIONS": {
             "connect_timeout": 10,
+            "options": "-c statement_timeout=30000",
         },
     }
 }
 
+
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
 
 LANGUAGE_CODE = "es-bo"
 TIME_ZONE = os.getenv("TIME_ZONE", "America/La_Paz")
 USE_I18N = True
 USE_TZ = True
 
+
+# 📁 STATIC & MEDIA
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "users.User"
 
+
+# 🔐 DRF + JWT
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
-    "rest_framework.permissions.IsAuthenticated",
-)
+        "rest_framework.permissions.IsAuthenticated",
+    ),
 }
 
 SIMPLE_JWT = {
@@ -132,7 +141,10 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
+
+# 🔴 REDIS / CHANNELS
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -142,31 +154,21 @@ CHANNEL_LAYERS = {
     }
 }
 
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = TIME_ZONE
 
-FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
-FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
-
+# 💰 PLANES
 PREMIUM_PLAN_PRICE = os.getenv("PREMIUM_PLAN_PRICE", "13.99")
 
-# ============================================================================
-# FREEMIUM CAPACITY LIMITS
-# ============================================================================
+# LIMITES FREEMIUM
 MAX_FREE_ROOMS = 2
 MAX_FREE_DEVICES_PER_ROOM = 2
 
+
+# 🌍 CORS
 CORS_ALLOW_ALL_ORIGINS = _env_bool("CORS_ALLOW_ALL_ORIGINS", default=False)
+CORS_ALLOWED_ORIGINS = _env_list("CORS_ALLOWED_ORIGINS")
 
-# ============================================================================
-# SECURITY & OPTIMIZATION FOR PRODUCTION
-# ============================================================================
 
-# SSL & SECURITY
+# 🔐 SEGURIDAD PRODUCCIÓN
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
@@ -177,29 +179,24 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-# DATABASE OPTIMIZATION
-DATABASES["default"]["CONN_MAX_AGE"] = 600
-DATABASES["default"]["OPTIONS"] = {
-    "connect_timeout": 10,
-    "options": "-c statement_timeout=30000",
-}
 
-# CACHE CONFIGURATION (Redis)
+# ⚡ CACHE (REDIS)
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": os.getenv("REDIS_URL", "redis://redis:6379/1"),
-       
         "KEY_PREFIX": "secure_lock",
         "TIMEOUT": 300,
     }
 }
 
-# SESSION CONFIGURATION
+
+# 🧠 SESIONES
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 
-# RATE LIMITING
+
+# 🚦 RATE LIMITING
 REST_FRAMEWORK.update({
     "DEFAULT_THROTTLE_CLASSES": (
         "rest_framework.throttling.AnonRateThrottle",
@@ -211,7 +208,8 @@ REST_FRAMEWORK.update({
     },
 })
 
-# LOGGING
+
+# 📜 LOGGING
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

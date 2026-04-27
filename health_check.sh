@@ -80,17 +80,10 @@ check_service "Backend-Port" "netstat -an 2>/dev/null | grep -q '8000' || lsof -
 
 # ═══════════════════════════════════════════════════════════════
 
-echo ""
-echo -e "${BLUE}5. CELERY WORKERS${NC}"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-check_service "Celery-Worker" "docker-compose ps celery_worker | grep -q 'Up'" "Celery worker running"
-check_service "Celery-Beat" "docker-compose ps celery_beat | grep -q 'Up'" "Celery beat running"
-
 # ═══════════════════════════════════════════════════════════════
 
 echo ""
-echo -e "${BLUE}6. DJANGO CONFIGURATION${NC}"
+echo -e "${BLUE}5. DJANGO CONFIGURATION${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 check_service "Settings" "docker-compose exec backend python -c 'import django; django.setup()'" "Django settings loaded"
