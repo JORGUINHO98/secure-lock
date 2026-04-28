@@ -117,13 +117,30 @@ class RoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="link-device")
     def link_device(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+
         serializer = LinkDeviceSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            logger.error(f"Errores de validación: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            room = get_object_or_404(Room, invite_code=serializer.validated_data["invite_code"])
-            device = get_object_or_404(Device, id_unico=serializer.validated_data["id_unico"])
+            room = serializer.sala
+            id_unico = serializer.validated_data["id_unico"]
             user = request.user
+
+            # 1. Obtener o Crear Dispositivo (Solución al error 400)
+            device, created = Device.objects.get_or_create(
+                id_unico=id_unico,
+                defaults={'owner': user, 'display_name': f'Dispositivo {id_unico[-5:]}'}
+            )
+            
+            if created:
+                logger.info(f"Dispositivo nuevo creado para usuario {user.username}: {id_unico}")
+            else:
+                if device.owner != user:
+                    return Response({"detail": "Este dispositivo pertenece a otro usuario."}, status=status.HTTP_403_FORBIDDEN)
 
             if user.role == User.Role.CREATOR and room.admin_id != user.id:
                 return Response(
@@ -131,15 +148,9 @@ class RoomViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
-            if user.role == User.Role.TARGET and device.owner_id != user.id:
-                return Response(
-                    {"detail": "Solo puedes vincular tus propios dispositivos."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
             # Verificar límites de dispositivos para usuarios gratuitos
             if not has_active_premium(room.admin):
-                if room.devices.count() >= settings.MAX_FREE_DEVICES_PER_ROOM:
+                if not room.devices.filter(id=device.id).exists() and room.devices.count() >= settings.MAX_FREE_DEVICES_PER_ROOM:
                     return Response(
                         {
                             "detail": f"Plan gratuito limitado a {settings.MAX_FREE_DEVICES_PER_ROOM} dispositivos por sala. "
@@ -148,15 +159,21 @@ class RoomViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_403_FORBIDDEN,
                     )
 
-            room.devices.add(device)
+            if not room.devices.filter(id=device.id).exists():
+                room.devices.add(device)
+
             return Response(
                 {
-                    "detail": "Dispositivo vinculado correctamente.",
+                    "mensaje": "Dispositivo vinculado exitosamente",
+                    "sala_id": str(room.id),
+                    "dispositivo_id": device.id,
+                    "creado": created,
                     "room": RoomSerializer(room, context={"request": request}).data,
                 },
                 status=status.HTTP_200_OK,
             )
         except Exception as exc:
+            logger.error(f"Error al vincular dispositivo: {str(exc)}")
             return Response(
                 {"detail": "No se pudo vincular el dispositivo.", "error": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST,

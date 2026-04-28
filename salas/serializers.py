@@ -93,7 +93,12 @@ class LinkDeviceSerializer(serializers.Serializer):
         id_unico = attrs.get("id_unico") or attrs.get("unique_id")
         if not id_unico:
             raise serializers.ValidationError({"id_unico": "Debes enviar id_unico o unique_id."})
-        if not Device.objects.filter(id_unico=id_unico).exists():
-            raise serializers.ValidationError("No existe un dispositivo con ese ID unico.")
         attrs["id_unico"] = id_unico
+        
+        invite_code = attrs.get("invite_code")
+        try:
+            self.sala = Room.objects.get(invite_code=invite_code)
+        except Room.DoesNotExist:
+            raise serializers.ValidationError({"invite_code": "La sala con este código no existe."})
+            
         return attrs
